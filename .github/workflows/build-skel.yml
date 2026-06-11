@@ -1,4 +1,4 @@
-name: Build libhtp_ops_skel.so (Hexagon v75)
+name: Build libhtp_ops_skel.so
 
 on:
   push:
@@ -6,79 +6,86 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-skel:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Hexagon SDK
-        id: cache-sdk
-        uses: actions/cache@v4
-        with:
-          path: ~/Hexagon_SDK
-          key: hexagon-sdk-6.6.0.0-${{ runner.os }}
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential curl wget unzip ninja-build
 
-      - name: Download Hexagon SDK
+      - name: Restore SDK cache
+        id: cache-sdk
+        uses: actions/cache/restore@v4
+        with:
+          path: /tmp/hexagon-sdk.zip
+          key: hexagon-sdk-6.6.0.0
+
+      - name: Download SDK
         if: steps.cache-sdk.outputs.cache-hit != 'true'
         run: |
-          cd ~
-          curl -L -o Hexagon_SDK_Linux.zip "https://softwarecenter.qualcomm.com/api/download/software/sdks/Hexagon_SDK/Linux/Debian/6.6.0.0/Hexagon_SDK_Linux.zip"
-          unzip -q Hexagon_SDK_Linux.zip
-          rm Hexagon_SDK_Linux.zip
-          ls ~/Hexagon_SDK*
+          wget -q "https://softwarecenter.qualcomm.com/api/download/software/sdks/Hexagon_SDK/Linux/Debian/6.6.0.0/Hexagon_SDK_Linux.zip" -O /tmp/hexagon-sdk.zip
+          echo "Downloaded: $(ls -lh /tmp/hexagon-sdk.zip)"
 
-      - name: Generate IDL marshalling code
+      - name: Save SDK cache
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: /tmp/hexagon-sdk.zip
+          key: hexagon-sdk-6.6.0.0
+
+      - name: Extract SDK
         run: |
-          SDK=~/Hexagon_SDK
-          QAIC=$SDK/ipc/fastrpc/qaic/Ubuntu/qaic
-          chmod +x $QAIC
-          
-          mkdir -p build
-          $QAIC -mdll -o build \
-            -I$SDK/incs -I$SDK/incs/stddef \
-            include/htp_ops.idl
-          
-          echo "Generated files:"
-          ls -la build/
+          if [ ! -d "/opt/hexagon-sdk/Hexagon_SDK" ]; then
+            unzip -q /tmp/hexagon-sdk.zip -d /opt/hexagon-sdk
+          fi
+          SDK=$(find /opt/hexagon-sdk -maxdepth 3 -name "setup_sdk_env.source" -exec dirname {} \; 2>/dev/null | head -1)
+          echo "SDK=$SDK"
 
-      - name: Build skel library
+          # Fix QAIC: cmake references bin/qaic but only Ubuntu/qaic exists
+          mkdir -p $SDK/ipc/fastrpc/qaic/bin
+          cp $SDK/ipc/fastrpc/qaic/Ubuntu/qaic $SDK/ipc/fastrpc/qaic/bin/qaic
+          chmod +x $SDK/ipc/fastrpc/qaic/bin/qaic
+
+      - name: Find SDK root
+        id: sdk-root
         run: |
-          SDK=~/Hexagon_SDK
-          TOOLS=$SDK/tools/HEXAGON_Tools/19.0.07/Tools
-          CC=$TOOLS/bin/hexagon-clang
-          CXX=$TOOLS/bin/hexagon-clang++
-          TARGET_LIB=$TOOLS/target/hexagon/lib
-          
-          CFLAGS="-mv75 -G0 -fpic -mhvx -mhmx -Wall -Werror -fno-zero-initialized-in-bss -fdata-sections"
-          INCLUDES="-I$SDK/incs -I$SDK/incs/stddef -I$SDK/ipc/fastrpc/incs -Iinclude -Isrc/dsp -Isrc/dsp/ops"
-          
-          mkdir -p build/obj
-          
-          echo "=== Compiling sources ==="
-          for f in build/htp_ops_skel.c src/dsp/commu.c src/dsp/power.c src/dsp/hmx_mgr.c \
-                   src/dsp/worker_pool.c src/dsp/op_executor.cc src/dsp/op_tests.cc \
-                   src/dsp/vtcm_mgr.cc src/dsp/ops/flash_attn_sp_hdim.c \
-                   src/dsp/ops/flash_attn.c src/dsp/ops/mat_mul.c \
-                   src/dsp/ops/precompute_table.c src/dsp/ops/rms_norm.c \
-                   src/dsp/ops/mm_benchmark.c; do
-            OBJ="build/obj/$(basename $f).o"
-            echo "  CC $f -> $OBJ"
-            $CC $CFLAGS $INCLUDES -c $f -o $OBJ || exit 1
-          done
-          
-          echo "=== Linking libhtp_ops_skel.so ==="
-          $CC -mv75 -G0 -fpic -shared -Wl,-Bsymbolic \
-            -o build/libhtp_ops_skel.so \
-            build/obj/*.o \
-            -L$TOOLS/lib \
-            -lc++ -lc++abi -lc
-          
-          echo "=== Build complete ==="
-          ls -la build/libhtp_ops_skel.so
-          file build/libhtp_ops_skel.so
+          SDK_ROOT=$(find /opt/hexagon-sdk -maxdepth 3 -name "setup_sdk_env.source" -exec dirname {} \; 2>/dev/null | head -1)
+          echo "path=$SDK_ROOT" >> $GITHUB_OUTPUT
 
-      - name: Upload artifact
+      - name: Build libhtp_ops_skel.so
+        env:
+          HEXAGON_SDK_ROOT: ${{ steps.sdk-root.outputs.path }}
+        run: |
+          SDK=$HEXAGON_SDK_ROOT
+          TOOLS=$SDK/tools/HEXAGON_Tools/19.0.07
+
+          cmake -S . -B build_hex \
+            -DCMAKE_TOOLCHAIN_FILE=$SDK/build/cmake/hexagon_toolchain.cmake \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_MAKE_PROGRAM=$(which ninja) \
+            -GNinja \
+            -DHEXAGON_SDK_ROOT=$SDK \
+            -DHEXAGON_CMAKE_ROOT=$SDK/build/cmake \
+            -DHEXAGON_TOOLS_ROOT=$TOOLS \
+            -DDSP_VERSION=v75 \
+            -DQURT_OS=1 \
+            -DV=hexagon_toolv19_v75 \
+            -DPREBUILT_LIB_DIR=hexagon_toolv19_v75 \
+            -DCMAKE_LIBRARY_OUTPUT_DIRECTORY=$(pwd)/build_hex/ship \
+            -DCMAKE_RUNTIME_OUTPUT_DIRECTORY=$(pwd)/build_hex/ship \
+            -DCMAKE_ARCHIVE_OUTPUT_DIRECTORY=$(pwd)/build_hex/ship
+
+          cmake --build build_hex -j$(nproc)
+
+          echo "=== Build results ==="
+          find build_hex -name "*.so" 2>/dev/null
+          ls -la build_hex/ship/ 2>/dev/null
+
+      - name: Upload
         uses: actions/upload-artifact@v4
         with:
           name: libhtp_ops_skel-v75
-          path: build/libhtp_ops_skel.so
+          path: |
+            ${{ github.workspace }}/build_hex/ship/*.so
+            ${{ github.workspace }}/build_hex/ship/*.map
