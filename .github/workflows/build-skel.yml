@@ -1,0 +1,84 @@
+name: Build libhtp_ops_skel.so (Hexagon v75)
+
+on:
+  push:
+    branches: [build-with-idl]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Cache Hexagon SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/Hexagon_SDK
+          key: hexagon-sdk-6.6.0.0-${{ runner.os }}
+
+      - name: Download Hexagon SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          cd ~
+          curl -L -o qhdksdksa.tar.gz "https://www.qualcomm.com/content/dam/qcomm-martech/dm-assets/files/Q.SDK.6.6.0010.0.1330.2025.03.18_compressed.tar.gz"
+          tar xzf qhdksdksa.tar.gz
+          rm qhdksdksa.tar.gz
+          ls ~/Hexagon_SDK*
+
+      - name: Generate IDL marshalling code
+        run: |
+          SDK=~/Hexagon_SDK
+          QAIC=$SDK/ipc/fastrpc/qaic/Ubuntu/qaic
+          chmod +x $QAIC
+          
+          mkdir -p build
+          $QAIC -mdll -o build \
+            -I$SDK/incs -I$SDK/incs/stddef \
+            include/htp_ops.idl
+          
+          echo "Generated files:"
+          ls -la build/
+
+      - name: Build skel library
+        run: |
+          SDK=~/Hexagon_SDK
+          TOOLS=$SDK/tools/HEXAGON_Tools/19.0.07/Tools
+          CC=$TOOLS/bin/hexagon-clang
+          CXX=$TOOLS/bin/hexagon-clang++
+          TARGET_LIB=$TOOLS/target/hexagon/lib
+          
+          CFLAGS="-mv75 -G0 -fpic -mhvx -mhmx -Wall -Werror -fno-zero-initialized-in-bss -fdata-sections"
+          INCLUDES="-I$SDK/incs -I$SDK/incs/stddef -I$SDK/ipc/fastrpc/incs -Iinclude -Isrc/dsp -Isrc/dsp/ops"
+          
+          mkdir -p build/obj
+          
+          echo "=== Compiling sources ==="
+          for f in build/htp_ops_skel.c src/dsp/commu.c src/dsp/power.c src/dsp/hmx_mgr.c \
+                   src/dsp/worker_pool.c src/dsp/op_executor.cc src/dsp/op_tests.cc \
+                   src/dsp/vtcm_mgr.cc src/dsp/ops/flash_attn_sp_hdim.c \
+                   src/dsp/ops/flash_attn.c src/dsp/ops/mat_mul.c \
+                   src/dsp/ops/precompute_table.c src/dsp/ops/rms_norm.c \
+                   src/dsp/ops/mm_benchmark.c; do
+            OBJ="build/obj/$(basename $f).o"
+            echo "  CC $f -> $OBJ"
+            $CC $CFLAGS $INCLUDES -c $f -o $OBJ || exit 1
+          done
+          
+          echo "=== Linking libhtp_ops_skel.so ==="
+          $CC -mv75 -G0 -fpic -shared -Wl,-Bsymbolic \
+            -o build/libhtp_ops_skel.so \
+            build/obj/*.o \
+            -L$TOOLS/lib \
+            -lc++ -lc++abi -lc
+          
+          echo "=== Build complete ==="
+          ls -la build/libhtp_ops_skel.so
+          file build/libhtp_ops_skel.so
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: libhtp_ops_skel-v75
+          path: build/libhtp_ops_skel.so
