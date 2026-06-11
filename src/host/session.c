@@ -30,16 +30,13 @@ int open_dsp_session(int domain_id, int unsigned_pd_enabled) {
 
       err = remote_session_control(DSPRPC_CONTROL_UNSIGNED_MODULE, &ctrl, sizeof(ctrl));
       if (err != AEE_SUCCESS) {
-        fprintf(stderr, "ERROR 0x%x: remote_session_control failed\n", err);
-        goto bail;
+        fprintf(stderr, "WARNING 0x%x: remote_session_control failed, continuing anyway\n", err);
+        err = AEE_SUCCESS;
       }
     } else {
-      err = AEE_EUNSUPPORTED;
       fprintf(stderr,
-              "ERROR 0x%x: remote_session_control interface is not supported on "
-              "this device\n",
-              err);
-      goto bail;
+              "WARNING: remote_session_control interface is not supported on "
+              "this device, continuing anyway\n");
     }
   }
 
