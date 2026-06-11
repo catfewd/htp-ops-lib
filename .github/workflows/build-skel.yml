@@ -22,9 +22,9 @@ jobs:
         if: steps.cache-sdk.outputs.cache-hit != 'true'
         run: |
           cd ~
-          curl -L -o qhdksdksa.tar.gz "https://www.qualcomm.com/content/dam/qcomm-martech/dm-assets/files/Q.SDK.6.6.0010.0.1330.2025.03.18_compressed.tar.gz"
-          tar xzf qhdksdksa.tar.gz
-          rm qhdksdksa.tar.gz
+          curl -L -o Hexagon_SDK_Linux.zip "https://softwarecenter.qualcomm.com/api/download/software/sdks/Hexagon_SDK/Linux/Debian/6.6.0.0/Hexagon_SDK_Linux.zip"
+          unzip -q Hexagon_SDK_Linux.zip
+          rm Hexagon_SDK_Linux.zip
           ls ~/Hexagon_SDK*
 
       - name: Generate IDL marshalling code
