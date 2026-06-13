@@ -7,10 +7,10 @@ int htp_ops_rpc_rms_norm_f32(int dst_fd, int dst_offset, int src_fd, int src_off
   return htp_ops_rms_norm_f32(get_global_handle(), dst_fd, dst_offset, src_fd, src_offset, ne0, ne1);
 }
 
-int htp_ops_rpc_conv1d_f32(int dst_fd, int dst_offset, int src_fd, int src_offset,
+int htp_ops_rpc_conv1d_f16(int dst_fd, int dst_offset, int src_fd, int src_offset,
     int weight_fd, int weight_offset, int bias_fd, int bias_offset,
     int T, int C_in, int C_out, int K, int stride, int pad) {
-  return htp_ops_conv1d_f32(get_global_handle(),
+  return htp_ops_conv1d_f16(get_global_handle(),
     dst_fd, dst_offset, src_fd, src_offset,
     weight_fd, weight_offset, bias_fd, bias_offset,
     T, C_in, C_out, K, stride, pad);

@@ -16,7 +16,7 @@ interface htp_ops : remote_handle64 {
     AEEResult mat_mul_permuted_w16a32(in int32 fd0, in int32 offset0, in int32 fd1, in int32 offset1, in int32 fd2, in int32 offset2,
         in int32 m, in int32 k, in int32 n);
     
-    AEEResult conv1d_f32(in int32 fd_dst, in int32 offset_dst,
+    AEEResult conv1d_f16(in int32 fd_dst, in int32 offset_dst,
         in int32 fd_src, in int32 offset_src,
         in int32 fd_weight, in int32 offset_weight,
         in int32 fd_bias, in int32 offset_bias,

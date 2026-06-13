@@ -258,6 +258,7 @@ __QAIC_HEADER_EXPORT AEEResult __QAIC_HEADER(htp_ops_create_channel)(remote_hand
 __QAIC_HEADER_EXPORT AEEResult __QAIC_HEADER(htp_ops_destroy_channel)(remote_handle64 _h) __QAIC_HEADER_ATTRIBUTE;
 __QAIC_HEADER_EXPORT AEEResult __QAIC_HEADER(htp_ops_rms_norm_f32)(remote_handle64 _h, int32 fd0, int32 offset0, int32 fd1, int32 offset1, int32 ne0, int32 ne1) __QAIC_HEADER_ATTRIBUTE;
 __QAIC_HEADER_EXPORT AEEResult __QAIC_HEADER(htp_ops_mat_mul_permuted_w16a32)(remote_handle64 _h, int32 fd0, int32 offset0, int32 fd1, int32 offset1, int32 fd2, int32 offset2, int32 m, int32 k, int32 n) __QAIC_HEADER_ATTRIBUTE;
+__QAIC_HEADER_EXPORT AEEResult __QAIC_HEADER(htp_ops_conv1d_f16)(remote_handle64 _h, int32 fd_dst, int32 offset_dst, int32 fd_src, int32 offset_src, int32 fd_weight, int32 offset_weight, int32 fd_bias, int32 offset_bias, int32 T, int32 C_in, int32 C_out, int32 K, int32 stride, int32 pad) __QAIC_HEADER_ATTRIBUTE;
 __QAIC_HEADER_EXPORT AEEResult __QAIC_HEADER(htp_ops_test_ops)(remote_handle64 _h) __QAIC_HEADER_ATTRIBUTE;
 #ifndef htp_ops_URI
 #define htp_ops_URI "file:///libhtp_ops_skel.so?htp_ops_skel_handle_invoke&_modver=1.0"
