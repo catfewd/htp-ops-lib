@@ -1,9 +1,8 @@
-name: Build libhtp_ops_skel.so
+name: Build libhtp_ops_skel.so (Hexagon v75)
 
 on:
   push:
     branches: [build-with-idl]
-  workflow_dispatch:
 
 jobs:
   build-skel:
@@ -18,44 +17,38 @@ jobs:
         id: cache-sdk
         uses: actions/cache/restore@v4
         with:
-          path: /tmp/hexagon-sdk.zip
-          key: hexagon-sdk-6.6.0.0
+          path: /opt/hexagon-sdk
+          key: hexagon-sdk-6.6.0.0-extracted
 
       - name: Download SDK
         if: steps.cache-sdk.outputs.cache-hit != 'true'
         run: |
           wget -q "https://softwarecenter.qualcomm.com/api/download/software/sdks/Hexagon_SDK/Linux/Debian/6.6.0.0/Hexagon_SDK_Linux.zip" -O /tmp/hexagon-sdk.zip
-          echo "Downloaded: $(ls -lh /tmp/hexagon-sdk.zip)"
+          unzip -q /tmp/hexagon-sdk.zip -d /opt
+          ls -la /opt/
 
       - name: Save SDK cache
         if: steps.cache-sdk.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: /tmp/hexagon-sdk.zip
-          key: hexagon-sdk-6.6.0.0
-
-      - name: Extract SDK
-        run: |
-          # Extract SDK zip (creates Hexagon_SDK/6.6.0.0/...)
-          unzip -q /tmp/hexagon-sdk.zip -d /opt || true
-          # Find SDK root - look in common locations
-          SDK=$(find /opt -name "setup_sdk_env.source" -exec dirname {} \; 2>/dev/null | head -1)
-          if [ -z "$SDK" ]; then
-            echo "ERROR: SDK not found after extraction"
-            exit 1
-          fi
-          echo "SDK=$SDK"
-
-          # Fix QAIC: cmake references bin/qaic but only Ubuntu/qaic exists
-          mkdir -p "${SDK}/ipc/fastrpc/qaic/bin"
-          cp "${SDK}/ipc/fastrpc/qaic/Ubuntu/qaic" "${SDK}/ipc/fastrpc/qaic/bin/qaic"
-          chmod +x "${SDK}/ipc/fastrpc/qaic/bin/qaic"
+          path: /opt/hexagon-sdk
+          key: hexagon-sdk-6.6.0.0-extracted
 
       - name: Find SDK root
         id: sdk-root
         run: |
-          SDK_ROOT=$(find /opt/hexagon-sdk -maxdepth 3 -name "setup_sdk_env.source" -exec dirname {} \; 2>/dev/null | head -1)
+          SDK_ROOT=$(find /opt -name "setup_sdk_env.source" -exec dirname {} \; 2>/dev/null | head -1)
+          echo "SDK=$SDK_ROOT"
           echo "path=$SDK_ROOT" >> $GITHUB_OUTPUT
+
+      - name: Fix QAIC symlink
+        run: |
+          SDK=$(find /opt -name "setup_sdk_env.source" -exec dirname {} \; 2>/dev/null | head -1)
+          mkdir -p "${SDK}/ipc/fastrpc/qaic/bin"
+          if [ -f "${SDK}/ipc/fastrpc/qaic/Ubuntu/qaic" ]; then
+            cp "${SDK}/ipc/fastrpc/qaic/Ubuntu/qaic" "${SDK}/ipc/fastrpc/qaic/bin/qaic"
+            chmod +x "${SDK}/ipc/fastrpc/qaic/bin/qaic"
+          fi
 
       - name: Build libhtp_ops_skel.so
         env:
@@ -83,8 +76,8 @@ jobs:
           cmake --build build_hex -j$(nproc)
 
           echo "=== Build results ==="
+          ls -la build_hex/ship/ 2>/dev/null || echo "No ship directory"
           find build_hex -name "*.so" 2>/dev/null
-          ls -la build_hex/ship/ 2>/dev/null
 
       - name: Build libhtp_ops.so (host/Android)
         env:
@@ -110,8 +103,7 @@ jobs:
           cmake --build build_hlos -j$(nproc)
 
           echo "=== HLOS build results ==="
-          find build_hlos -name "libhtp_ops.so" 2>/dev/null
-          ls -la build_hlos/ 2>/dev/null
+          ls -la build_hlos/ 2>/dev/null || echo "No build_hlos directory"
           find build_hlos -name "*.so" 2>/dev/null
 
       - name: Upload
