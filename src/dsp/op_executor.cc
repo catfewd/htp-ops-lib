@@ -197,9 +197,9 @@ int execute_op_simple(struct OpComputeRequest *req) {
       }
       break;
 
-    case HTP_OPS_CONV1D_F32:
+    case HTP_OPS_CONV1D_F16:
       {
-        auto params = reinterpret_cast<Conv1dF32Params *>(req->payload);
+        auto params = reinterpret_cast<Conv1dF16Params *>(req->payload);
         int T = params->T, C_in = params->C_in, C_out = params->C_out;
         int K = params->K, stride = params->stride, pad = params->pad;
 
