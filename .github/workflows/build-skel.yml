@@ -36,16 +36,20 @@ jobs:
 
       - name: Extract SDK
         run: |
-          if [ ! -d "/opt/hexagon-sdk/Hexagon_SDK" ]; then
-            unzip -q /tmp/hexagon-sdk.zip -d /opt/hexagon-sdk
+          # Extract SDK zip (creates Hexagon_SDK/6.6.0.0/...)
+          unzip -q /tmp/hexagon-sdk.zip -d /opt || true
+          # Find SDK root - look in common locations
+          SDK=$(find /opt -name "setup_sdk_env.source" -exec dirname {} \; 2>/dev/null | head -1)
+          if [ -z "$SDK" ]; then
+            echo "ERROR: SDK not found after extraction"
+            exit 1
           fi
-          SDK=$(find /opt/hexagon-sdk -maxdepth 3 -name "setup_sdk_env.source" -exec dirname {} \; 2>/dev/null | head -1)
           echo "SDK=$SDK"
 
           # Fix QAIC: cmake references bin/qaic but only Ubuntu/qaic exists
-          mkdir -p $SDK/ipc/fastrpc/qaic/bin
-          cp $SDK/ipc/fastrpc/qaic/Ubuntu/qaic $SDK/ipc/fastrpc/qaic/bin/qaic
-          chmod +x $SDK/ipc/fastrpc/qaic/bin/qaic
+          mkdir -p "${SDK}/ipc/fastrpc/qaic/bin"
+          cp "${SDK}/ipc/fastrpc/qaic/Ubuntu/qaic" "${SDK}/ipc/fastrpc/qaic/bin/qaic"
+          chmod +x "${SDK}/ipc/fastrpc/qaic/bin/qaic"
 
       - name: Find SDK root
         id: sdk-root
