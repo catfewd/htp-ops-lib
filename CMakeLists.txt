@@ -79,6 +79,7 @@ else()
         ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/precompute_table.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/rms_norm.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/mm_benchmark.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/conv1d.c
     )
     build_idl(include/htp_ops.idl htp_ops_skel)
 

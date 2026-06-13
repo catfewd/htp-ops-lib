@@ -82,6 +82,34 @@ jobs:
           find build_hex -name "*.so" 2>/dev/null
           ls -la build_hex/ship/ 2>/dev/null
 
+      - name: Build libhtp_ops.so (host/Android)
+        env:
+          HEXAGON_SDK_ROOT: ${{ steps.sdk-root.outputs.path }}
+        run: |
+          SDK=$HEXAGON_SDK_ROOT
+
+          # Download Android NDK r28b
+          wget -q "https://dl.google.com/android/repository/android-ndk-r28b-linux.zip" -O /tmp/ndk.zip
+          unzip -q /tmp/ndk.zip -d /opt
+          NDK=/opt/android-ndk-r28b
+
+          cmake -S . -B build_hlos \
+            -DCMAKE_TOOLCHAIN_FILE=$NDK/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-24 \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DHEXAGON_SDK_ROOT=$SDK \
+            -DHEXAGON_CMAKE_ROOT=$SDK/build/cmake \
+            -GNinja \
+            -DCMAKE_MAKE_PROGRAM=$(which ninja)
+
+          cmake --build build_hlos -j$(nproc)
+
+          echo "=== HLOS build results ==="
+          find build_hlos -name "libhtp_ops.so" 2>/dev/null
+          ls -la build_hlos/ 2>/dev/null
+          find build_hlos -name "*.so" 2>/dev/null
+
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
@@ -89,3 +117,4 @@ jobs:
           path: |
             ${{ github.workspace }}/build_hex/ship/*.so
             ${{ github.workspace }}/build_hex/ship/*.map
+            ${{ github.workspace }}/build_hlos/**/libhtp_ops.so

@@ -197,6 +197,30 @@ int execute_op_simple(struct OpComputeRequest *req) {
       }
       break;
 
+    case HTP_OPS_CONV1D_F32:
+      {
+        auto params = reinterpret_cast<Conv1dF32Params *>(req->payload);
+        int T = params->T, C_in = params->C_in, C_out = params->C_out;
+        int K = params->K, stride = params->stride, pad = params->pad;
+
+        size_t src_size    = T * C_in * sizeof(__fp16);
+        size_t dst_size    = ((T + 2*pad - K) / stride + 1) * C_out * sizeof(__fp16);
+        size_t weight_size = K * C_in * C_out * sizeof(__fp16);
+        size_t bias_size   = C_out * sizeof(__fp16);
+
+        add_buffer(out_bufs, params->dst, dst_size);
+        add_buffer(in_bufs, params->src, src_size);
+        add_buffer(in_bufs, params->weight, weight_size);
+        add_buffer(in_bufs, params->bias, bias_size);
+
+        validate_in_bufs();
+        ret = hvx_conv1d_f16((__fp16 *) OUT_PTR(0), (__fp16 *) IN_PTR(0),
+                              (__fp16 *) IN_PTR(1), (__fp16 *) IN_PTR(2),
+                              T, C_in, C_out, K, stride, pad);
+        validate_out_bufs();
+      }
+      break;
+
     default:
       break;
   }

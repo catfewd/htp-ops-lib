@@ -14,6 +14,10 @@ extern "C" {
 
 int hvx_rms_norm_f32(float *restrict dst, const float *restrict src, int ne0, int ne1);
 
+int hvx_conv1d_f16(__fp16 *restrict dst, const __fp16 *restrict src,
+                    const __fp16 *restrict weight, const __fp16 *restrict bias,
+                    int T, int C_in, int C_out, int K, int stride, int pad);
+
 int hmx_mat_mul_permuted_w16a32(float *restrict dst, const float *activation, const __fp16 *permuted_weight, int m,
                                 int k, int n);
 int hmx_mat_mul_permuted_qk_0_d16a32(float *restrict dst, const float *activation, const uint8_t *permuted_weight,
