@@ -384,6 +384,55 @@ bail:
   return err;
 }
 
+// FastRPC interface - f16 version (direct f16 input, calls hvx_conv1d_f16)
+AEEResult htp_ops_conv1d_f16(remote_handle64 handle,
+    int32 fd_dst, int32 offset_dst,
+    int32 fd_src, int32 offset_src,
+    int32 fd_weight, int32 offset_weight,
+    int32 fd_bias, int32 offset_bias,
+    int32 T, int32 C_in, int32 C_out,
+    int32 K, int32 stride, int32 pad) {
+  uint8_t *p_dst, *p_src, *p_w, *p_b;
+  p_dst = p_src = p_w = p_b = NULL;
+
+  int err = HAP_mmap_get(fd_dst, (void **) &p_dst, NULL);
+  if (err) { FARF(ALWAYS, "HAP_mmap_get dst failed: %d", err); goto bail; }
+  err = HAP_mmap_get(fd_src, (void **) &p_src, NULL);
+  if (err) { FARF(ALWAYS, "HAP_mmap_get src failed: %d", err); goto bail; }
+  err = HAP_mmap_get(fd_weight, (void **) &p_w, NULL);
+  if (err) { FARF(ALWAYS, "HAP_mmap_get weight failed: %d", err); goto bail; }
+  err = HAP_mmap_get(fd_bias, (void **) &p_b, NULL);
+  if (err) { FARF(ALWAYS, "HAP_mmap_get bias failed: %d", err); goto bail; }
+
+  __fp16 *dst    = (__fp16 *) (p_dst + offset_dst);
+  __fp16 *src    = (__fp16 *) (p_src + offset_src);
+  __fp16 *weight = (__fp16 *) (p_w + offset_weight);
+  __fp16 *bias   = (__fp16 *) (p_b + offset_bias);
+
+  int dst_T = (T + 2 * pad - K) / stride + 1;
+  size_t src_size    = T * C_in * sizeof(__fp16);
+  size_t dst_size    = dst_T * C_out * sizeof(__fp16);
+  size_t weight_size = K * C_in * C_out * sizeof(__fp16);
+  size_t bias_size   = C_out * sizeof(__fp16);
+
+  qurt_mem_cache_clean((qurt_addr_t) src, src_size, QURT_MEM_CACHE_INVALIDATE, QURT_MEM_DCACHE);
+  qurt_mem_cache_clean((qurt_addr_t) weight, weight_size, QURT_MEM_CACHE_INVALIDATE, QURT_MEM_DCACHE);
+  qurt_mem_cache_clean((qurt_addr_t) bias, bias_size, QURT_MEM_CACHE_INVALIDATE, QURT_MEM_DCACHE);
+
+  err = hvx_conv1d_f16(dst, src, weight, bias, T, C_in, C_out, K, stride, pad);
+  if (err) { FARF(ALWAYS, "hvx_conv1d_f16 failed: %d", err); goto bail; }
+
+  qurt_mem_cache_clean((qurt_addr_t) dst, dst_size, QURT_MEM_CACHE_FLUSH, QURT_MEM_DCACHE);
+
+bail:
+  if (p_dst) HAP_mmap_put(fd_dst);
+  if (p_src) HAP_mmap_put(fd_src);
+  if (p_w)   HAP_mmap_put(fd_weight);
+  if (p_b)   HAP_mmap_put(fd_bias);
+  return err;
+}
+
+
 // FastRPC interface
 AEEResult htp_ops_conv1d_f32(remote_handle64 handle,
     int32 fd_dst, int32 offset_dst,
