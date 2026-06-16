@@ -1,4 +1,5 @@
-# build output
-android*
-hexagon*
-
+build/
+*.o
+*.so
+*.skel.c
+*.stub.c
