@@ -40,7 +40,6 @@ int hvx_soft_max_f32(float *restrict dst, const float *restrict src,
         const float *restrict row_src = src + r * ne00;
 
         int nv = ne00 / VLEN_F32;
-        int lv = ne00 % VLEN_F32;
 
         // find max
         float max_val = -INFINITY;
