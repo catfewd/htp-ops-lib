@@ -18,6 +18,17 @@ int hvx_conv1d_f16(__fp16 *restrict dst, const __fp16 *restrict src,
                     const __fp16 *restrict weight, const __fp16 *restrict bias,
                     int T, int C_in, int C_out, int K, int stride, int pad);
 
+int hvx_silu_f32(float *restrict dst, const float *restrict src, int ne);
+
+int hvx_add_f32(float *restrict dst, const float *restrict a, const float *restrict b, int ne);
+
+int hvx_mul_f32(float *restrict dst, const float *restrict a, const float *restrict b, int ne);
+
+int hvx_soft_max_f32(float *restrict dst, const float *restrict src,
+                      int ne00, int ne01, int ne02, int ne03);
+
+int hvx_scale_f32(float *restrict dst, const float *restrict src, float scale, int ne);
+
 int hmx_mat_mul_permuted_w16a32(float *restrict dst, const float *activation, const __fp16 *permuted_weight, int m,
                                 int k, int n);
 int hmx_mat_mul_permuted_qk_0_d16a32(float *restrict dst, const float *activation, const uint8_t *permuted_weight,

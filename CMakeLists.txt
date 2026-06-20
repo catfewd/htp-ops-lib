@@ -80,6 +80,11 @@ else()
         ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/rms_norm.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/mm_benchmark.c
         ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/conv1d.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/silu.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/add.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/mul.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/softmax.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/dsp/ops/scale.c
     )
     build_idl(include/htp_ops.idl htp_ops_skel)
 

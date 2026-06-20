@@ -9,7 +9,14 @@ enum HtpOpsIndex {
   HTP_OPS_MAT_MUL_PERMUTED_W8D16A32,
   HTP_OPS_MAT_MUL_PERMUTED_W4D16A32_IQ4_NL,
   HTP_OPS_FLASH_ATTN_QO_F32_KV_F16,
+  HTP_OPS_CONV1D_F32,
   HTP_OPS_CONV1D_F16,
+  HTP_OPS_SILU_F32,
+  HTP_OPS_ADD_F32,
+  HTP_OPS_MUL_F32,
+  HTP_OPS_SOFT_MAX_F32,
+  HTP_OPS_SCALE_F32,
+  HTP_OPS_COPY_F32,
   HTP_OPS_COUNT,
 };
 
@@ -58,4 +65,40 @@ struct Conv1dF16Params {
   int32_t K;
   int32_t stride;
   int32_t pad;
+} __attribute__((packed));
+
+struct SiluF32Params {
+  struct RpcmemBufAddr dst;
+  struct RpcmemBufAddr src;
+  int32_t       ne;
+} __attribute__((packed));
+
+struct AddF32Params {
+  struct RpcmemBufAddr dst;
+  struct RpcmemBufAddr a;
+  struct RpcmemBufAddr b;
+  int32_t       ne;
+} __attribute__((packed));
+
+struct MulF32Params {
+  struct RpcmemBufAddr dst;
+  struct RpcmemBufAddr a;
+  struct RpcmemBufAddr b;
+  int32_t       ne;
+} __attribute__((packed));
+
+struct SoftMaxF32Params {
+  struct RpcmemBufAddr dst;
+  struct RpcmemBufAddr src;
+  int32_t       ne00;
+  int32_t       ne01;
+  int32_t       ne02;
+  int32_t       ne03;
+} __attribute__((packed));
+
+struct ScaleF32Params {
+  struct RpcmemBufAddr dst;
+  struct RpcmemBufAddr src;
+  float         scale;
+  int32_t       ne;
 } __attribute__((packed));

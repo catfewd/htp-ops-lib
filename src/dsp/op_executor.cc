@@ -221,6 +221,83 @@ int execute_op_simple(struct OpComputeRequest *req) {
       }
       break;
 
+    case HTP_OPS_SILU_F32:
+      {
+        auto params = reinterpret_cast<SiluF32Params *>(req->payload);
+        size_t size = params->ne * sizeof(float);
+
+        add_buffer(out_bufs, params->dst, size);
+        add_buffer(in_bufs, params->src, size);
+
+        validate_in_bufs();
+        ret = hvx_silu_f32((float *) OUT_PTR(0), (const float *) IN_PTR(0), params->ne);
+        validate_out_bufs();
+      }
+      break;
+
+    case HTP_OPS_ADD_F32:
+      {
+        auto params = reinterpret_cast<AddF32Params *>(req->payload);
+        size_t size = params->ne * sizeof(float);
+
+        add_buffer(out_bufs, params->dst, size);
+        add_buffer(in_bufs, params->a, size);
+        add_buffer(in_bufs, params->b, size);
+
+        validate_in_bufs();
+        ret = hvx_add_f32((float *) OUT_PTR(0), (const float *) IN_PTR(0),
+                          (const float *) IN_PTR(1), params->ne);
+        validate_out_bufs();
+      }
+      break;
+
+    case HTP_OPS_MUL_F32:
+      {
+        auto params = reinterpret_cast<MulF32Params *>(req->payload);
+        size_t size = params->ne * sizeof(float);
+
+        add_buffer(out_bufs, params->dst, size);
+        add_buffer(in_bufs, params->a, size);
+        add_buffer(in_bufs, params->b, size);
+
+        validate_in_bufs();
+        ret = hvx_mul_f32((float *) OUT_PTR(0), (const float *) IN_PTR(0),
+                          (const float *) IN_PTR(1), params->ne);
+        validate_out_bufs();
+      }
+      break;
+
+    case HTP_OPS_SOFT_MAX_F32:
+      {
+        auto params = reinterpret_cast<SoftMaxF32Params *>(req->payload);
+
+        size_t size = params->ne00 * params->ne01 * params->ne02 * params->ne03 * sizeof(float);
+
+        add_buffer(out_bufs, params->dst, size);
+        add_buffer(in_bufs, params->src, size);
+
+        validate_in_bufs();
+        ret = hvx_soft_max_f32((float *) OUT_PTR(0), (const float *) IN_PTR(0),
+                                params->ne00, params->ne01, params->ne02, params->ne03);
+        validate_out_bufs();
+      }
+      break;
+
+    case HTP_OPS_SCALE_F32:
+      {
+        auto params = reinterpret_cast<ScaleF32Params *>(req->payload);
+        size_t size = params->ne * sizeof(float);
+
+        add_buffer(out_bufs, params->dst, size);
+        add_buffer(in_bufs, params->src, size);
+
+        validate_in_bufs();
+        ret = hvx_scale_f32((float *) OUT_PTR(0), (const float *) IN_PTR(0),
+                            params->scale, params->ne);
+        validate_out_bufs();
+      }
+      break;
+
     default:
       break;
   }
