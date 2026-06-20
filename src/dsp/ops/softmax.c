@@ -5,21 +5,24 @@
 
 #define VLEN_F32 32
 
-static HVX_Vector hvx_hmax_f32(HVX_Vector v) {
+static float hvx_hmax_f32(HVX_Vector v) {
     for (int s = VLEN_F32 / 2; s >= 1; s >>= 1) {
-        v = Q6_Vsf_equals_Vqf32(
-            Q6_Vqf32_vmax_VsfVsf(v, Q6_V_vlalign_VVR(v, Q6_V_vzero(), s * 4)));
+        HVX_Vector shifted = Q6_V_vlalign_VVR(v, Q6_V_vzero(), s * 4);
+        v = Q6_Vsf_vmax_VsfVsf(v, shifted);
     }
-    return v;
+    float tmp[VLEN_F32] __attribute__((aligned(VLEN)));
+    vmem(tmp) = v;
+    return tmp[0];
 }
 
-static HVX_Vector hvx_hsum_f32(HVX_Vector v) {
-    // convert sf→qf32, sum pair-wise, repeat
+static float hvx_hsum_f32(HVX_Vector v) {
     HVX_Vector sum = Q6_Vqf32_vadd_VsfVsf(v, Q6_V_vzero());
     for (int s = VLEN_F32 / 2; s >= 1; s >>= 1) {
         sum = Q6_Vqf32_vadd_Vqf32Vqf32(sum, Q6_V_vlalign_VVR(sum, Q6_V_vzero(), s * 4));
     }
-    return Q6_Vsf_equals_Vqf32(sum);
+    float tmp[VLEN_F32] __attribute__((aligned(VLEN)));
+    vmem(tmp) = Q6_Vsf_equals_Vqf32(sum);
+    return tmp[0];
 }
 
 int hvx_soft_max_f32(float *restrict dst, const float *restrict src,
@@ -30,78 +33,65 @@ int hvx_soft_max_f32(float *restrict dst, const float *restrict src,
 
     float log2e = 1.4426950408889634f;
     HVX_Vector log2e_v = Q6_V_vsplat_R(*(int32_t *)&log2e);
-    HVX_Vector one_v   = Q6_V_vsplat_R(0x3F800000);
+    HVX_Vector zero_v  = Q6_V_vzero();
 
     for (int64_t r = 0; r < n_rows; ++r) {
         float *restrict row_dst = dst + r * ne00;
         const float *restrict row_src = src + r * ne00;
 
-        // find max
-        float max_val = -INFINITY;
         int nv = ne00 / VLEN_F32;
         int lv = ne00 % VLEN_F32;
 
+        // find max
+        float max_val = -INFINITY;
         if (nv > 0) {
             HVX_Vector vmax_sf = vmemu(row_src);
             for (int i = 1; i < nv; ++i) {
                 HVX_Vector vs = vmemu(row_src + i * VLEN_F32);
-                vmax_sf = Q6_Vsf_equals_Vqf32(Q6_Vqf32_vmax_VsfVsf(vmax_sf, vs));
+                vmax_sf = Q6_Vsf_vmax_VsfVsf(vmax_sf, vs);
             }
-            vmax_sf = hvx_hmax_f32(vmax_sf);
-            float tmp[VLEN_F32] __attribute__((aligned(VLEN)));
-            vmem(tmp) = vmax_sf;
-            max_val = tmp[0];
-            for (int i = 1; i < VLEN_F32; ++i) {
-                if (tmp[i] > max_val) max_val = tmp[i];
-            }
+            max_val = hvx_hmax_f32(vmax_sf);
         }
         for (int i = nv * VLEN_F32; i < ne00; ++i) {
             if (row_src[i] > max_val) max_val = row_src[i];
         }
 
         // compute exp(x - max) and sum
-        HVX_Vector max_v   = Q6_V_vsplat_R(*(int32_t *)&max_val);
-        HVX_Vector sum_sf  = Q6_V_vzero();
+        HVX_Vector max_v = Q6_V_vsplat_R(*(int32_t *)&max_val);
+        HVX_Vector sum_qf = zero_v;
 
         for (int i = 0; i < nv; ++i) {
             HVX_Vector xs = vmemu(row_src + i * VLEN_F32);
 
-            // x - max
-            HVX_Vector xmm = Q6_Vsf_equals_Vqf32(Q6_Vqf32_vsub_VsfVsf(xs, max_v));
+            // x - max (sf → qf32 → sf)
+            HVX_Vector xmm_qf = Q6_Vqf32_vsub_VsfVsf(xs, max_v);
+            HVX_Vector xmm_sf = Q6_Vsf_equals_Vqf32(xmm_qf);
 
             // exp(x-max) = exp2((x-max) * log2(e))
-            HVX_Vector xmm_l_qf32 = Q6_Vqf32_vmpy_VsfVsf(xmm, log2e_v);
-            HVX_Vector xmm_l_sf   = Q6_Vsf_equals_Vqf32(xmm_l_qf32);
-            HVX_Vector ex_sf      = hvx_my_exp2_vsf(xmm_l_sf);
+            HVX_Vector xl_qf = Q6_Vqf32_vmpy_VsfVsf(xmm_sf, log2e_v);
+            HVX_Vector xl_sf = Q6_Vsf_equals_Vqf32(xl_qf);
+            HVX_Vector ex_sf = hvx_my_exp2_vsf(xl_sf);
 
             vmemu(row_dst + i * VLEN_F32) = ex_sf;
-
-            // accumulate sum
-            sum_sf = Q6_Vsf_equals_Vqf32(Q6_Vqf32_vadd_VsfVsf(sum_sf, ex_sf));
+            sum_qf = Q6_Vqf32_vadd_VsfVsf(sum_qf, ex_sf);
         }
 
-        // leftover
+        // leftover scalar
         float sum_val = 0.0f;
         for (int i = nv * VLEN_F32; i < ne00; ++i) {
-            float xm  = row_src[i] - max_val;
-            float ex  = expf(xm);
+            float xm = row_src[i] - max_val;
+            float ex = expf(xm);
             row_dst[i] = ex;
-            sum_val  += ex;
+            sum_val += ex;
         }
 
-        // reduce sum across vector lanes
-        HVX_Vector hsum = hvx_hsum_f32(sum_sf);
-        float tmp_s[VLEN_F32] __attribute__((aligned(VLEN)));
-        vmem(tmp_s) = hsum;
-        for (int i = 0; i < VLEN_F32; ++i) {
-            sum_val += tmp_s[i];
-        }
+        // accumulate HVX sum lanes
+        sum_val += hvx_hsum_f32(Q6_Vsf_equals_Vqf32(sum_qf));
 
-        // reciprocal of sum
+        // divide each element by sum
         float inv_sum = 1.0f / sum_val;
         HVX_Vector inv_sum_v = Q6_V_vsplat_R(*(int32_t *)&inv_sum);
 
-        // multiply each element by 1/sum
         for (int i = 0; i < nv; ++i) {
             HVX_Vector ev = vmemu(row_dst + i * VLEN_F32);
             vmemu(row_dst + i * VLEN_F32) = Q6_Vsf_equals_Vqf32(Q6_Vqf32_vmpy_VsfVsf(ev, inv_sum_v));
