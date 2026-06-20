@@ -1,3 +1,5 @@
+#include <math.h>
+
 #include "dsp/hvx_internal.h"
 #include "dsp/hvx_math.h"
 
